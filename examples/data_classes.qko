@@ -1,0 +1,250 @@
+// ============================================================
+// data_classes.qko — OOP Example in Quicklin
+// ============================================================
+// Demonstrates:
+//   dc   → data class      (data class declaration)
+//   cl   → class            (class declaration)
+//   ifc  → interface        (interface declaration)
+//   abs  → abstract         (abstract modifier)
+//   ovr  → override         (override modifier)
+//   cmp  → companion        (companion modifier)
+//   ob   → object           (object declaration)
+//   seal → sealed           (sealed modifier)
+//   enm  → enum             (enum modifier)
+//   prv  → private          (private visibility)
+//   pub  → public           (public visibility)
+//   prt  → protected        (protected visibility)
+//   opn  → open             (open modifier for inheritance)
+//   Str  → String           (String type)
+//   Bool → Boolean          (Boolean type)
+//   Dbl  → Double           (Double type)
+//   fn   → fun              (function declaration)
+//   vl   → val              (immutable variable)
+//   rt   → return           (return value)
+//   pr   → println          (print with newline)
+//   wn   → when             (when expression)
+// ============================================================
+
+// ------------------------------------
+// Enum class — enm cl = enum class
+// ------------------------------------
+enm cl Priority {
+    LOW,
+    MEDIUM,
+    HIGH,
+    CRITICAL
+}
+
+// ------------------------------------
+// Interface — ifc = interface
+// abs = abstract (implicit in interface methods)
+// ------------------------------------
+ifc Displayable {
+    fn display(): Str
+    fn summary(): Str {
+        // Default implementation
+        rt "Summary: ${display()}"
+    }
+}
+
+ifc Prioritizable {
+    vl priority: Priority
+    fn isUrgent(): Bool {
+        rt priority == Priority.HIGH || priority == Priority.CRITICAL
+    }
+}
+
+// ------------------------------------
+// Data class — dc = data class
+// Str = String, Int stays as Int
+// ------------------------------------
+dc User(
+    vl id: Int,
+    vl name: Str,
+    vl email: Str,
+    vl role: Str = "member"
+) : Displayable {
+    // ovr = override
+    ovr fn display(): Str {
+        rt "$name ($email) [${role.uppercase()}]"
+    }
+}
+
+// ------------------------------------
+// Data class implementing multiple interfaces
+// Dbl = Double  |  Bool = Boolean
+// ------------------------------------
+dc Task(
+    vl id: Int,
+    vl title: Str,
+    vl assignee: User,
+    ovr vl priority: Priority,
+    vl completed: Bool = fl    // fl = false
+) : Displayable, Prioritizable {
+
+    ovr fn display(): Str {
+        vl status = if (completed) "✅" el "⏳"
+        rt "$status [$priority] $title → ${assignee.name}"
+    }
+}
+
+// ------------------------------------
+// Sealed class — seal cl = sealed class
+// Used for restricted class hierarchies
+// ------------------------------------
+seal cl TaskResult {
+    // dc = data class (subclasses of sealed class)
+    dc Success(vl task: Task, vl message: Str) : TaskResult()
+    dc Failure(vl task: Task, vl error: Str) : TaskResult()
+    // ob = object (singleton subclass)
+    ob Cancelled : TaskResult()
+}
+
+// ------------------------------------
+// Open class with protected members
+// opn = open  |  cl = class  |  prt = protected  |  prv = private
+// ------------------------------------
+opn cl ProjectBase(
+    vl name: Str,
+    vl owner: User
+) {
+    // prv = private (only accessible within this class)
+    prv vr _taskCount: Int = 0
+
+    // prt = protected (accessible in subclasses)
+    prt fn validateTask(task: Task): Bool {
+        rt task.title.isNotBlank()
+    }
+
+    pub fn getTaskCount(): Int = _taskCount
+
+    prt fn incrementTaskCount() {
+        _taskCount++
+    }
+}
+
+// ------------------------------------
+// Class with companion object
+// cl = class  |  cmp ob = companion object
+// ------------------------------------
+cl Project(
+    name: Str,
+    owner: User,
+    prv vl maxTasks: Int = 100
+) : ProjectBase(name, owner), Displayable {
+
+    prv vl tasks: MLst<Task> = mutableListOf()
+    prv vl results: MLst<TaskResult> = mutableListOf()
+
+    // cmp ob = companion object (factory methods)
+    cmp ob {
+        prv vr nextId: Int = 1
+
+        fn create(name: Str, ownerName: Str, ownerEmail: Str): Project {
+            vl owner = User(
+                id = nextId++,
+                name = ownerName,
+                email = ownerEmail,
+                role = "owner"
+            )
+            rt Project(name, owner)
+        }
+    }
+
+    fn addTask(title: Str, assignee: User, priority: Priority): TaskResult {
+        if (tasks.size >= maxTasks) {
+            vl failedTask = Task(0, title, assignee, priority)
+            rt TaskResult.Failure(failedTask, "Project is full")
+        }
+
+        if (!validateTask(Task(tasks.size + 1, title, assignee, priority))) {
+            vl failedTask = Task(0, title, assignee, priority)
+            rt TaskResult.Failure(failedTask, "Invalid task")
+        }
+
+        vl task = Task(
+            id = tasks.size + 1,
+            title = title,
+            assignee = assignee,
+            priority = priority
+        )
+        tasks.add(task)
+        incrementTaskCount()
+
+        vl result = TaskResult.Success(task, "Task added successfully")
+        results.add(result)
+        rt result
+    }
+
+    fn getUrgentTasks(): Lst<Task> {
+        rt tasks.filter { it.isUrgent() }
+    }
+
+    // ovr = override (from Displayable interface)
+    ovr fn display(): Str {
+        rt "📁 $name (${tasks.size} tasks, owner: ${owner.name})"
+    }
+
+    fn printReport() {
+        pr(display())
+        pr("─".repeat(50))
+
+        // wn = when (exhaustive matching on sealed class)
+        fr (result in results) {
+            wn (result) {
+                is TaskResult.Success -> pr("  ✅ ${result.message}: ${result.task.title}")
+                is TaskResult.Failure -> pr("  ❌ ${result.error}: ${result.task.title}")
+                is TaskResult.Cancelled -> pr("  🚫 Task was cancelled")
+            }
+        }
+
+        pr("")
+        vl urgent = getUrgentTasks()
+        if (urgent.isNotEmpty()) {
+            pr("  ⚠️  ${urgent.size} urgent task(s):")
+            fr (task in urgent) {
+                pr("     ${task.display()}")
+            }
+        }
+    }
+}
+
+// ------------------------------------
+// Main entry point
+// ------------------------------------
+fn main() {
+    pr("=== Data Classes & OOP in Quicklin ===")
+    pr("")
+
+    // Create users using dc (data class)
+    vl alice = User(1, "Alice", "alice@example.com", "lead")
+    vl bob = User(2, "Bob", "bob@example.com")
+    vl carol = User(3, "Carol", "carol@example.com", "developer")
+
+    // Data class features: toString, copy
+    pr("Users:")
+    pr("  ${alice.display()}")
+    pr("  ${bob.display()}")
+    pr("  Copied: ${bob.copy(role = "admin").display()}")
+    pr("")
+
+    // Create project using cmp ob (companion object) factory
+    vl project = Project.create("Quicklin Compiler", "Alice", "alice@example.com")
+
+    // Add tasks with different priorities
+    project.addTask("Design syntax spec", alice, Priority.HIGH)
+    project.addTask("Write parser", bob, Priority.CRITICAL)
+    project.addTask("Add tests", carol, Priority.MEDIUM)
+    project.addTask("Update docs", bob, Priority.LOW)
+
+    // Print the full report
+    project.printReport()
+
+    pr("")
+
+    // Demonstrate enum iteration
+    pr("Priority levels:")
+    fr (p in Priority.values()) {
+        pr("  ${p.ordinal}: $p")
+    }
+}

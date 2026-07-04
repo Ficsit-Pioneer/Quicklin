@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quicklin"
+version = "1.0.0"
+description = "Ultra-efficient shorthand that transpiles to Kotlin"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Quicklin Contributors"},
+]
+keywords = ["kotlin", "transpiler", "shorthand", "quicklin", "code-generation"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Code Generators",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/quicklin-lang/quicklin"
+Repository = "https://github.com/quicklin-lang/quicklin"
+"Bug Tracker" = "https://github.com/quicklin-lang/quicklin/issues"
+Documentation = "https://github.com/quicklin-lang/quicklin#readme"
+
+[project.scripts]
+quicklin = "quicklin.cli:main"
+
+[tool.setuptools]
+packages = ["quicklin"]

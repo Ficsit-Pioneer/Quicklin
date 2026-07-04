@@ -1,0 +1,76 @@
+// ============================================================
+// hello_world.qko — Beginner-Friendly Quicklin Example
+// ============================================================
+// Demonstrates:
+//   fn  → fun        (function declaration)
+//   vl  → val        (immutable variable)
+//   vr  → var        (mutable variable)
+//   Str → String     (type shortcut)
+//   pr  → println    (print with newline)
+//   pt  → print      (print without newline)
+//   el  → else       (else branch)
+//   rt  → return     (return from function)
+// ============================================================
+
+// ------------------------------------
+// A simple greeting function
+// fn  = fun   |  Str = String  |  rt = return
+// ------------------------------------
+fn greet(name: Str, formal: Bool): Str {
+    // 'if' and 'el' (else) with string interpolation
+    if (formal) {
+        rt "Good evening, $name. Welcome."
+    } el {
+        rt "Hey, $name! What's up?"
+    }
+}
+
+// ------------------------------------
+// Main entry point
+// fn = fun  |  pr = println  |  pt = print
+// vl = val  |  vr = var      |  Str = String
+// ------------------------------------
+fn main() {
+    // vl declares an immutable value (like Kotlin's val)
+    vl language: Str = "Quicklin"
+    vl version: Int = 1
+
+    // pr prints a line (println), pt prints without newline (print)
+    pr("Welcome to $language v$version!")
+    pr("================================")
+
+    // vr declares a mutable variable (like Kotlin's var)
+    vr counter: Int = 0
+
+    // Simple if/el conditional
+    if (counter == 0) {
+        pr("Counter is at zero — let's get started!")
+    } el {
+        pr("Counter is already at $counter")
+    }
+
+    // Using the greet function with string interpolation
+    vl casualGreeting = greet("Alice", fl)    // fl = false
+    vl formalGreeting = greet("Dr. Smith", tr) // tr = true
+
+    pr(casualGreeting)
+    pr(formalGreeting)
+
+    // Mutating a var
+    counter = 42
+    pr("Counter updated to $counter")
+
+    // Multi-line string interpolation
+    vl summary = """
+        |Language: $language
+        |Version:  $version
+        |Counter:  $counter
+    """.trimMargin()
+
+    pr(summary)
+
+    // pt (print) doesn't add a newline
+    pt("Enter your name: ")
+    vl userName: Str = "World"  // placeholder for readLine()
+    pr("Hello, $userName! 👋")
+}

@@ -1,0 +1,140 @@
+// ============================================================
+// fibonacci.qko — Algorithm Example in Quicklin
+// ============================================================
+// Demonstrates:
+//   fn   → fun           (function declaration)
+//   rt   → return        (return value)
+//   wh   → while         (while loop)
+//   wn   → when          (when expression)
+//   fr   → for           (for loop)
+//   Lst  → List          (immutable list type)
+//   MLst → MutableList   (mutable list type)
+//   Lng  → Long          (Long type)
+//   pr   → println       (print with newline)
+//   vl   → val           (immutable variable)
+//   vr   → var           (mutable variable)
+// ============================================================
+
+// ------------------------------------
+// Recursive Fibonacci
+// fn = fun  |  Lng = Long  |  rt = return  |  wn = when
+// ------------------------------------
+fn fibRecursive(n: Int): Lng {
+    // wn (when) expression — Quicklin's match/switch
+    rt wn {
+        n <= 0  -> 0L
+        n == 1  -> 1L
+        // Recursive calls for larger values
+        el      -> fibRecursive(n - 1) + fibRecursive(n - 2)
+    }
+}
+
+// ------------------------------------
+// Iterative Fibonacci using a while loop
+// wh = while  |  vr = var  |  Lng = Long
+// ------------------------------------
+fn fibIterative(n: Int): Lng {
+    if (n <= 0) rt 0L
+    if (n == 1) rt 1L
+
+    vr prev: Lng = 0L
+    vr curr: Lng = 1L
+    vr i = 2
+
+    // wh = while loop
+    wh (i <= n) {
+        vl next = prev + curr
+        prev = curr
+        curr = next
+        i++
+    }
+
+    rt curr
+}
+
+// ------------------------------------
+// Generate a Fibonacci sequence as a List
+// Lst = List  |  MLst = MutableList  |  fr = for
+// ------------------------------------
+fn fibSequence(count: Int): Lst<Lng> {
+    // MLst = MutableList — a growable list
+    vl result: MLst<Lng> = mutableListOf()
+
+    // fr (for) loop with range
+    fr (i in 0 until count) {
+        result.add(fibIterative(i))
+    }
+
+    // Return as immutable Lst (List)
+    rt result.toList()
+}
+
+// ------------------------------------
+// Categorize Fibonacci numbers using when
+// wn = when  |  Str = String
+// ------------------------------------
+fn categorizeFib(value: Lng): Str {
+    rt wn {
+        value == 0L        -> "Zero"
+        value == 1L        -> "Unity"
+        value < 10L        -> "Small"
+        value < 100L       -> "Medium"
+        value < 1000L      -> "Large"
+        el                 -> "Very Large ($value)"
+    }
+}
+
+// ------------------------------------
+// Find Fibonacci numbers matching a predicate
+// ------------------------------------
+fn findFibsAbove(threshold: Lng, count: Int): Lst<Lng> {
+    vl sequence = fibSequence(count)
+    // Using Kotlin's standard library filter
+    rt sequence.filter { it > threshold }
+}
+
+// ------------------------------------
+// Main entry point
+// ------------------------------------
+fn main() {
+    pr("=== Fibonacci in Quicklin ===")
+    pr("")
+
+    // Recursive approach (small values to avoid stack overflow)
+    pr("--- Recursive Fibonacci ---")
+    fr (n in 0..10) {
+        vl result = fibRecursive(n)
+        pr("  fib($n) = $result [${categorizeFib(result)}]")
+    }
+
+    pr("")
+
+    // Iterative approach (handles larger values efficiently)
+    pr("--- Iterative Fibonacci ---")
+    fr (n in listOf(10, 20, 30, 40, 50)) {
+        vl result = fibIterative(n)
+        pr("  fib($n) = $result")
+    }
+
+    pr("")
+
+    // Generate and display a sequence
+    pr("--- Fibonacci Sequence (first 15) ---")
+    vl sequence: Lst<Lng> = fibSequence(15)
+    pr("  $sequence")
+
+    pr("")
+
+    // Find large Fibonacci numbers
+    pr("--- Fibonacci numbers > 100 (first 20 terms) ---")
+    vl largeFibs = findFibsAbove(100L, 20)
+    fr (fib in largeFibs) {
+        pr("  $fib")
+    }
+
+    pr("")
+
+    // Sum of a Fibonacci sequence
+    vl sum = fibSequence(10).sum()
+    pr("Sum of first 10 Fibonacci numbers: $sum")
+}

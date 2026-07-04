@@ -1,0 +1,251 @@
+// ============================================================
+// null_safety.qko — Null Handling Example in Quicklin
+// ============================================================
+// Demonstrates:
+//   nl   → null           (null literal)
+//   ??   → ?:             (elvis / null coalescing operator)
+//   ?.   → ?.             (safe call operator — unchanged)
+//   wn   → when           (when expression)
+//   fn   → fun            (function declaration)
+//   vl   → val            (immutable variable)
+//   vr   → var            (mutable variable)
+//   rt   → return         (return value)
+//   pr   → println        (print with newline)
+//   Str  → String         (String type)
+//   Bool → Boolean        (Boolean type)
+//   Dbl  → Double         (Double type)
+//   dc   → data class     (data class)
+//   prv  → private        (private modifier)
+// ============================================================
+
+// ------------------------------------
+// Data classes with nullable fields
+// dc = data class  |  Str = String  |  nl = null
+// ------------------------------------
+dc Address(
+    vl street: Str,
+    vl city: Str,
+    vl state: Str?,          // Nullable — might be nl (null)
+    vl zipCode: Str?
+)
+
+dc UserProfile(
+    vl name: Str,
+    vl email: Str?,          // Email might not be provided
+    vl age: Int?,            // Age might be unknown
+    vl address: Address?,    // User might not have an address
+    vl scores: Lst<Dbl>?     // Scores might not exist yet
+)
+
+// ------------------------------------
+// Safe call chains and elvis operator
+// ?. = safe call  |  ?? = elvis (?:)
+// ------------------------------------
+fn getDisplayName(profile: UserProfile?): Str {
+    // ?. safe call — returns nl if profile is nl
+    // ?? elvis — provides default if left side is nl
+    vl name = profile?.name ?? "Anonymous"
+    vl email = profile?.email ?? "no-email"
+    rt "$name <$email>"
+}
+
+fn getCityOrDefault(profile: UserProfile?): Str {
+    // Chained safe calls: profile?.address?.city
+    // ?? (elvis) provides fallback if any link in the chain is nl
+    rt profile?.address?.city ?? "Unknown City"
+}
+
+fn getFormattedZip(profile: UserProfile?): Str {
+    // Safe call with method invocation
+    rt profile?.address?.zipCode?.take(5) ?? "N/A"
+}
+
+// ------------------------------------
+// Null checks with when expressions
+// wn = when  |  nl = null
+// ------------------------------------
+fn describeAge(age: Int?): Str {
+    // wn (when) with nl checks
+    rt wn {
+        age == nl        -> "Age unknown"
+        age < 0          -> "Invalid age"
+        age < 13         -> "Child"
+        age < 18         -> "Teenager"
+        age < 65         -> "Adult"
+        el               -> "Senior"
+    }
+}
+
+fn analyzeEmail(email: Str?): Str {
+    // wn (when) expression matching on nullable value
+    rt wn (email) {
+        nl                          -> "No email provided"
+        ""                          -> "Empty email"
+        // Smart cast: email is non-null Str here
+        el -> wn {
+            "@" !in email           -> "Invalid: missing @"
+            email.endsWith(".com")  -> "Commercial email: $email"
+            email.endsWith(".edu")  -> "Educational email: $email"
+            email.endsWith(".org")  -> "Organization email: $email"
+            el                      -> "Other email: $email"
+        }
+    }
+}
+
+// ------------------------------------
+// Smart casting with is and nl checks
+// ------------------------------------
+fn processValue(value: Any?): Str {
+    // After a nl check, the compiler smart-casts to non-null
+    if (value == nl) {
+        rt "Received nl (null) value"
+    }
+
+    // After the nl check above, value is smart-cast to Any (non-null)
+    // Further 'is' checks smart-cast to specific types
+    rt wn (value) {
+        is Str  -> "String of length ${value.length}: \"$value\""
+        is Int  -> "Integer: $value (doubled = ${value * 2})"
+        is Dbl  -> "Double: $value (rounded = ${value.toLong()})"
+        is Bool -> "Boolean: $value (negated = ${!value})"
+        is Lst<*> -> "List with ${value.size} elements"
+        el      -> "Unknown type: ${value::class.simpleName}"
+    }
+}
+
+// ------------------------------------
+// Scope functions: let, also, run
+// Used for null-safe operations
+// ------------------------------------
+fn demonstrateScopeFunctions(profile: UserProfile?) {
+    pr("--- Scope Functions ---")
+
+    // let: execute block only if non-null, transform value
+    profile?.email?.let { email ->
+        pr("  .let → Processing email: $email")
+        pr("  .let → Domain: ${email.substringAfter("@")}")
+    }
+
+    // also: execute side effect, return original value
+    vl profileInfo = profile?.also { p ->
+        pr("  .also → Logging access to profile: ${p.name}")
+    }
+
+    // run: execute block on object, return result
+    vl summary = profile?.run {
+        // 'this' refers to the profile inside run
+        vl emailPart = email ?? "N/A"
+        vl agePart = describeAge(age)
+        "$name | $emailPart | $agePart"
+    } ?? "No profile available"
+
+    pr("  .run → Summary: $summary")
+
+    // Combining scope functions with ?? (elvis)
+    vl scoreAverage = profile?.scores?.let { scores ->
+        if (scores.isEmpty()) nl  // return nl if empty
+        el scores.average()
+    } ?? 0.0
+
+    pr("  Score average: $scoreAverage")
+}
+
+// ------------------------------------
+// Practical example: safe data pipeline
+// ------------------------------------
+fn processUserData(rawName: Str?, rawEmail: Str?, rawAge: Str?): UserProfile {
+    // Parse nullable inputs safely using ?.let and ??
+    vl name: Str = rawName?.trim()?.takeIf { it.isNotEmpty() } ?? "Guest"
+    vl email: Str? = rawEmail?.trim()?.takeIf { it.contains("@") }
+    vl age: Int? = rawAge?.toIntOrNull()
+
+    rt UserProfile(
+        name = name,
+        email = email,
+        age = age,
+        address = nl,      // nl = null
+        scores = nl
+    )
+}
+
+// ------------------------------------
+// Main entry point
+// ------------------------------------
+fn main() {
+    pr("=== Null Safety in Quicklin ===")
+    pr("")
+
+    // Create profiles — some with nl (null) fields
+    vl fullProfile = UserProfile(
+        name = "Alice",
+        email = "alice@example.com",
+        age = 30,
+        address = Address("123 Main St", "Springfield", "IL", "62701"),
+        scores = listOf(95.5, 87.3, 92.1)
+    )
+
+    vl partialProfile = UserProfile(
+        name = "Bob",
+        email = nl,          // nl = null — no email
+        age = nl,            // nl = null — age unknown
+        address = Address("456 Oak Ave", "Portland", nl, nl),
+        scores = nl
+    )
+
+    vl nlProfile: UserProfile? = nl   // Entirely nl (null)
+
+    // Safe calls and elvis operator
+    pr("--- Display Names (using ?. and ??) ---")
+    pr("  Full:    ${getDisplayName(fullProfile)}")
+    pr("  Partial: ${getDisplayName(partialProfile)}")
+    pr("  Null:    ${getDisplayName(nlProfile)}")
+    pr("")
+
+    // Chained safe calls
+    pr("--- Cities (chained ?. safe calls) ---")
+    pr("  Full:    ${getCityOrDefault(fullProfile)}")
+    pr("  Partial: ${getCityOrDefault(partialProfile)}")
+    pr("  Null:    ${getCityOrDefault(nlProfile)}")
+    pr("")
+
+    // When with null checks
+    pr("--- Age Categories (wn with nl) ---")
+    pr("  Alice: ${describeAge(fullProfile.age)}")
+    pr("  Bob:   ${describeAge(partialProfile.age)}")
+    pr("  Null:  ${describeAge(nl)}")
+    pr("")
+
+    // Email analysis
+    pr("--- Email Analysis ---")
+    pr("  Alice: ${analyzeEmail(fullProfile.email)}")
+    pr("  Bob:   ${analyzeEmail(partialProfile.email)}")
+    pr("  Empty: ${analyzeEmail("")}")
+    pr("  Bad:   ${analyzeEmail("not-an-email")}")
+    pr("")
+
+    // Smart casting
+    pr("--- Smart Casting ---")
+    pr("  ${processValue("Hello")}")
+    pr("  ${processValue(42)}")
+    pr("  ${processValue(3.14)}")
+    pr("  ${processValue(tr)}")           // tr = true
+    pr("  ${processValue(nl)}")           // nl = null
+    pr("  ${processValue(listOf(1, 2))}")
+    pr("")
+
+    // Scope functions
+    demonstrateScopeFunctions(fullProfile)
+    pr("")
+    demonstrateScopeFunctions(nlProfile)
+    pr("")
+
+    // Data pipeline with nullable inputs
+    pr("--- Safe Data Pipeline ---")
+    vl user1 = processUserData("  Alice  ", "alice@uni.edu", "25")
+    vl user2 = processUserData(nl, nl, "not-a-number")
+    vl user3 = processUserData("", "bad-email", nl)
+
+    pr("  User1: ${getDisplayName(user1)} — ${describeAge(user1.age)}")
+    pr("  User2: ${getDisplayName(user2)} — ${describeAge(user2.age)}")
+    pr("  User3: ${getDisplayName(user3)} — ${describeAge(user3.age)}")
+}

@@ -1,0 +1,357 @@
+// ============================================================
+// coroutines.qko — Async / Coroutines Example in Quicklin
+// ============================================================
+// Demonstrates:
+//   imp   → import         (import statement)
+//   sus   → suspend        (suspend modifier for coroutines)
+//   fn    → fun            (function declaration)
+//   fr    → for            (for loop)
+//   rt    → return         (return value)
+//   pr    → println        (print with newline)
+//   vl    → val            (immutable variable)
+//   vr    → var            (mutable variable)
+//   try   → try            (unchanged — try block)
+//   ctch  → catch          (catch block)
+//   fnly  → finally        (finally block)
+//   thrw  → throw          (throw exception)
+//   wn    → when           (when expression)
+//   el    → else           (else branch)
+//   nl    → null           (null literal)
+//   ??    → ?:             (elvis operator)
+//   Str   → String         (String type)
+//   Lng   → Long           (Long type)
+//   Dbl   → Double         (Double type)
+//   Lst   → List           (List type)
+//   MLst  → MutableList    (MutableList type)
+//   Bool  → Boolean        (Boolean type)
+//   dc    → data class     (data class)
+//   seal  → sealed         (sealed modifier)
+//   prv   → private        (private modifier)
+// ============================================================
+
+// ------------------------------------
+// imp = import — bring in coroutine libraries
+// ------------------------------------
+imp kotlinx.coroutines.*
+imp kotlinx.coroutines.async
+imp kotlinx.coroutines.awaitAll
+imp kotlin.system.measureTimeMillis
+imp kotlin.random.Random
+
+// ------------------------------------
+// Data models
+// dc = data class  |  Str = String  |  Dbl = Double
+// ------------------------------------
+dc WeatherData(
+    vl city: Str,
+    vl temperature: Dbl,
+    vl humidity: Int,
+    vl condition: Str
+)
+
+dc StockPrice(
+    vl symbol: Str,
+    vl price: Dbl,
+    vl change: Dbl
+)
+
+// ------------------------------------
+// Sealed class for async results
+// seal cl = sealed class
+// ------------------------------------
+seal cl ApiResult<out T> {
+    dc Success<T>(vl data: T) : ApiResult<T>()
+    dc Error(vl message: Str, vl code: Int) : ApiResult<Nothing>()
+    ob Loading : ApiResult<Nothing>()
+}
+
+// ------------------------------------
+// Custom exception
+// cl = class  |  Str = String
+// ------------------------------------
+cl NetworkException(message: Str, vl statusCode: Int) : Exception(message)
+
+// ------------------------------------
+// Simulated API calls using suspend functions
+// sus fn = suspend fun  |  Lng = Long
+// ------------------------------------
+sus fn fetchWeather(city: Str): WeatherData {
+    // Simulate network delay
+    delay(Random.nextLong(500, 1500))
+
+    // thrw = throw — simulate occasional failures
+    if (Random.nextInt(10) < 2) {
+        thrw NetworkException("Failed to fetch weather for $city", 503)
+    }
+
+    rt WeatherData(
+        city = city,
+        temperature = Random.nextDouble(15.0, 35.0),
+        humidity = Random.nextInt(30, 90),
+        condition = listOf("Sunny", "Cloudy", "Rainy", "Windy").random()
+    )
+}
+
+sus fn fetchStockPrice(symbol: Str): StockPrice {
+    delay(Random.nextLong(300, 1000))
+
+    if (Random.nextInt(10) < 1) {
+        thrw NetworkException("Stock API timeout for $symbol", 408)
+    }
+
+    rt StockPrice(
+        symbol = symbol,
+        price = Random.nextDouble(10.0, 500.0),
+        change = Random.nextDouble(-5.0, 5.0)
+    )
+}
+
+// ------------------------------------
+// Safe API wrapper with try/ctch/fnly
+// try = try  |  ctch = catch  |  fnly = finally
+// ------------------------------------
+sus fn <T> safeApiCall(
+    operationName: Str,
+    block: sus () -> T
+): ApiResult<T> {
+    vr result: ApiResult<T> = ApiResult.Loading
+
+    try {
+        pr("  ⏳ Starting: $operationName...")
+        vl data = block()
+        result = ApiResult.Success(data)
+        pr("  ✅ Completed: $operationName")
+    } ctch (e: NetworkException) {
+        // ctch = catch — handle network-specific errors
+        result = ApiResult.Error(
+            "${e.message} (HTTP ${e.statusCode})",
+            e.statusCode
+        )
+        pr("  ❌ Network error in $operationName: ${e.message}")
+    } ctch (e: Exception) {
+        // Generic ctch (catch) for unexpected errors
+        result = ApiResult.Error(
+            e.message ?? "Unknown error",    // ?? = elvis (?:)
+            -1
+        )
+        pr("  ❌ Unexpected error in $operationName: ${e.message}")
+    } fnly {
+        // fnly = finally — always runs, cleanup logic
+        pr("  🏁 Finished: $operationName (result: ${result::class.simpleName})")
+    }
+
+    rt result
+}
+
+// ------------------------------------
+// Sequential fetching with a for loop
+// sus fn = suspend fun  |  fr = for
+// ------------------------------------
+sus fn fetchWeatherSequential(cities: Lst<Str>): Lst<ApiResult<WeatherData>> {
+    vl results: MLst<ApiResult<WeatherData>> = mutableListOf()
+
+    // fr = for loop — fetch one at a time
+    fr (city in cities) {
+        vl result = safeApiCall("Weather for $city") {
+            fetchWeather(city)
+        }
+        results.add(result)
+    }
+
+    rt results.toList()
+}
+
+// ------------------------------------
+// Parallel fetching with async/await
+// sus fn = suspend fun
+// ------------------------------------
+sus fn fetchWeatherParallel(cities: Lst<Str>): Lst<ApiResult<WeatherData>> =
+    coroutineScope {
+        // Launch all requests in parallel using async
+        vl deferreds = cities.map { city ->
+            async {
+                safeApiCall("Weather for $city") {
+                    fetchWeather(city)
+                }
+            }
+        }
+
+        // Await all results
+        deferreds.awaitAll()
+    }
+
+// ------------------------------------
+// Retry logic with exponential backoff
+// sus fn = suspend fun  |  wh = while (implicit in fr loop)
+// ------------------------------------
+sus fn <T> retryWithBackoff(
+    maxRetries: Int = 3,
+    initialDelayMs: Lng = 100L,
+    operationName: Str,
+    block: sus () -> T
+): ApiResult<T> {
+    vr lastException: Exception? = nl    // nl = null
+    vr currentDelay: Lng = initialDelayMs
+
+    // fr = for loop with retry attempts
+    fr (attempt in 1..maxRetries) {
+        try {
+            vl result = block()
+            rt ApiResult.Success(result)
+        } ctch (e: Exception) {
+            lastException = e
+            pr("    ⚠️  Attempt $attempt/$maxRetries failed: ${e.message}")
+
+            if (attempt < maxRetries) {
+                pr("    ⏰ Retrying in ${currentDelay}ms...")
+                delay(currentDelay)
+                currentDelay *= 2  // Exponential backoff
+            }
+        }
+    }
+
+    rt ApiResult.Error(
+        "All $maxRetries attempts failed for $operationName: ${lastException?.message ?? "Unknown"}",
+        -1
+    )
+}
+
+// ------------------------------------
+// Processing results with when on sealed class
+// wn = when
+// ------------------------------------
+fn <T> processResult(result: ApiResult<T>, label: Str) {
+    // wn (when) — exhaustive matching on sealed class
+    wn (result) {
+        is ApiResult.Success -> {
+            pr("  📊 $label → ${result.data}")
+        }
+        is ApiResult.Error -> {
+            pr("  💥 $label → ERROR: ${result.message} (code: ${result.code})")
+        }
+        is ApiResult.Loading -> {
+            pr("  ⏳ $label → Still loading...")
+        }
+    }
+}
+
+// ------------------------------------
+// Periodic task with coroutine
+// sus fn = suspend fun  |  fr = for  |  wh = while (via loop)
+// ------------------------------------
+sus fn periodicHealthCheck(intervalMs: Lng, iterations: Int) {
+    pr("  Starting health checks (every ${intervalMs}ms, $iterations times)...")
+
+    fr (i in 1..iterations) {
+        delay(intervalMs)
+        vl healthy: Bool = Random.nextBoolean()
+        vl status = if (healthy) "HEALTHY ✅" el "DEGRADED ⚠️"
+        pr("    Health check #$i: $status")
+
+        if (!healthy) {
+            pr("    🔄 Triggering recovery...")
+            delay(200)
+            pr("    ✅ Recovery complete")
+        }
+    }
+}
+
+// ------------------------------------
+// Main entry point — runBlocking bridge
+// ------------------------------------
+fn main() = runBlocking {
+    pr("=== Coroutines in Quicklin ===")
+    pr("")
+
+    // ------------------------------------
+    // 1. Sequential fetching
+    // ------------------------------------
+    pr("--- Sequential Weather Fetch ---")
+    vl cities: Lst<Str> = listOf("London", "Tokyo", "New York")
+
+    vl seqTime = measureTimeMillis {
+        vl seqResults = fetchWeatherSequential(cities)
+        fr (result in seqResults) {
+            processResult(result, "Sequential")
+        }
+    }
+    pr("  ⏱️  Sequential time: ${seqTime}ms")
+    pr("")
+
+    // ------------------------------------
+    // 2. Parallel fetching — much faster!
+    // ------------------------------------
+    pr("--- Parallel Weather Fetch ---")
+
+    vl parTime = measureTimeMillis {
+        vl parResults = fetchWeatherParallel(cities)
+        fr (result in parResults) {
+            processResult(result, "Parallel")
+        }
+    }
+    pr("  ⏱️  Parallel time: ${parTime}ms")
+    pr("")
+
+    // ------------------------------------
+    // 3. Retry with backoff
+    // ------------------------------------
+    pr("--- Retry with Exponential Backoff ---")
+    vl stockResult = retryWithBackoff(
+        maxRetries = 3,
+        initialDelayMs = 100L,
+        operationName = "GOOG stock"
+    ) {
+        fetchStockPrice("GOOG")
+    }
+    processResult(stockResult, "Stock Price")
+    pr("")
+
+    // ------------------------------------
+    // 4. Concurrent tasks with structured concurrency
+    // ------------------------------------
+    pr("--- Structured Concurrency ---")
+    coroutineScope {
+        // Launch multiple concurrent jobs
+        vl weatherJob = async {
+            safeApiCall("Berlin weather") { fetchWeather("Berlin") }
+        }
+        vl stockJob = async {
+            safeApiCall("AAPL stock") { fetchStockPrice("AAPL") }
+        }
+        vl healthJob = launch {
+            periodicHealthCheck(intervalMs = 300L, iterations = 3)
+        }
+
+        // Await async results
+        vl weatherResult = weatherJob.await()
+        vl stockPriceResult = stockJob.await()
+
+        processResult(weatherResult, "Berlin")
+        processResult(stockPriceResult, "AAPL")
+
+        // healthJob completes on its own (launch, not async)
+        healthJob.join()
+    }
+    pr("")
+
+    // ------------------------------------
+    // 5. Error handling showcase
+    // ------------------------------------
+    pr("--- Error Handling Patterns ---")
+    try {
+        // Deliberately trigger an error
+        vl badResult = safeApiCall("Invalid operation") {
+            thrw IllegalStateException("Something went very wrong!")
+        }
+        processResult(badResult, "Bad Call")
+    } ctch (e: Exception) {
+        // This shouldn't trigger — safeApiCall handles it internally
+        pr("  Outer ctch (catch): ${e.message}")
+    } fnly {
+        // fnly (finally) — always executes
+        pr("  fnly (finally): Error handling demo complete")
+    }
+
+    pr("")
+    pr("=== All coroutine examples complete! ===")
+}

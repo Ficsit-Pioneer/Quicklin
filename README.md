@@ -23,6 +23,8 @@ Quicklin is a **transpiled shorthand language** for Kotlin. Every `.qko` file ma
 
 The transpiler is a lightweight Python tool that tokenizes your source, replaces abbreviated keywords and types, and emits clean Kotlin. Strings and comments are **never** touched.
 
+A human came up with this idea. Quicklin was then planned out and finished by Claude Opus 4.6 in Antigravity. 
+
 ---
 
 ## 📊 By the Numbers: How Much Faster Is Quicklin?
